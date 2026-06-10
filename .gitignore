@@ -5,4 +5,8 @@ build/
 .vscode/ 
 *.log 
 .DS_Store 
-""   # This won't remove existing patterns
+
+node_modules/
+question-generator/node_modules/
+question-generator/.env
+question-generator/uploads/
