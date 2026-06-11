@@ -33,9 +33,13 @@ class _QuestionScreenState extends State<QuestionScreen> {
   final TextEditingController controller = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   
-  List<String> questions = [];
+  List<dynamic> briefQuestions = [];
+  List<dynamic> flashcards = [];
+
   bool isLoading = false;
   String? errorMessage;
+
+  int selectedTab = 0;
 
   Future<void> generateQuestions() async {
     if (controller.text.trim().isEmpty) {
@@ -48,16 +52,18 @@ class _QuestionScreenState extends State<QuestionScreen> {
     setState(() {
       isLoading = true;
       errorMessage = null;
-      questions = [];
+      briefQuestions  = [];
     });
 
     try {
-      final result = await ApiService().generateQuestions(controller.text.trim());
+      final result = await ApiService().generateBriefQuestions(controller.text.trim());
       
       setState(() {
-        questions = result.cast<String>();
+        briefQuestions = result;
         isLoading = false;
       });
+
+      await generateFlashcards();
       
       // Clear focus after generation
       _focusNode.unfocus();
@@ -68,7 +74,19 @@ class _QuestionScreenState extends State<QuestionScreen> {
       });
     }
   }
+  Future<void> generateFlashcards() async {
+  try {
+    final result = await ApiService()
+        .generateFlashcards(controller.text.trim());
 
+    setState(() {
+      flashcards = result;
+      selectedTab = 1;
+    });
+  } catch (e) {
+    print(e);
+  }
+}
   @override
   void dispose() {
     controller.dispose();
@@ -83,7 +101,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
         elevation: 0,
         centerTitle: true,
         title: const Text(
-          "📚 AI Questionnaire Builder",
+          "📚 AI Study Assistant",
           style: TextStyle(
             fontWeight: FontWeight.bold,
           ),
@@ -95,7 +113,7 @@ class _QuestionScreenState extends State<QuestionScreen> {
           children: [
             const SizedBox(height: 20),
             const Text(
-              "Generate Smart Questions",
+              "Enter any topic and instantly generate questions",
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -125,6 +143,29 @@ class _QuestionScreenState extends State<QuestionScreen> {
               onSubmitted: (_) => generateQuestions(),
             ),
             const SizedBox(height: 20),
+            const Text(
+  "OR",
+  style: TextStyle(
+    fontWeight: FontWeight.bold,
+  ),
+),
+
+const SizedBox(height: 20),
+
+OutlinedButton.icon(
+  onPressed: () {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text("PDF Upload Coming Soon"),
+      ),
+    );
+  },
+  icon: const Icon(Icons.upload_file),
+  label: const Text("Upload PDF"),
+),
+
+const SizedBox(height: 20),
+
             SizedBox(
               width: double.infinity,
               height: 55,
@@ -149,7 +190,36 @@ class _QuestionScreenState extends State<QuestionScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            if (questions.isEmpty && !isLoading)
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        selectedTab = 0;
+                      });
+                    },
+                    child: const Text("Brief Answers"),
+                  ),
+                ),
+
+                const SizedBox(width: 10),
+
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        selectedTab = 1;
+                      });
+                    },
+                    child: const Text("Flashcards"),
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+            if (briefQuestions.isEmpty && !isLoading)
               Expanded(
                 child: Center(
                   child: Column(
@@ -180,11 +250,16 @@ class _QuestionScreenState extends State<QuestionScreen> {
                   ),
                 ),
               )
-            else if (questions.isNotEmpty)
+            else if (briefQuestions.isNotEmpty)
               Expanded(
-                child: ListView.builder(
-                  itemCount: questions.length,
-                  itemBuilder: (context, index) {
+              child: ListView.builder(
+                itemCount: selectedTab == 0
+                    ? briefQuestions.length
+                    : flashcards.length,
+                itemBuilder: (context, index) {
+
+                  if (selectedTab == 0) {
+
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 8),
                       elevation: 2,
@@ -193,18 +268,68 @@ class _QuestionScreenState extends State<QuestionScreen> {
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
-                        child: Text(
-                          "${index + 1}. ${questions[index]}",
-                          style: const TextStyle(
-                            fontSize: 16,
-                            height: 1.4,
-                          ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Q${index + 1}: ${briefQuestions[index]["question"]}",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Text(
+                              "Answer: ${briefQuestions[index]["answer"]}",
+                              style: const TextStyle(
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
-                  },
-                ),
+
+                  } else {
+
+                    return Card(
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      elevation: 2,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              "Front: ${flashcards[index]["front"]}",
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+
+                            const SizedBox(height: 8),
+
+                            Text(
+                              "Back: ${flashcards[index]["back"]}",
+                              style: const TextStyle(
+                                fontSize: 15,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+
+                  }
+                },
               ),
+            ),
           ],
         ),
       ),
